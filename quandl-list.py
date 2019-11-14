@@ -12,10 +12,20 @@
 #     type: array
 #     description: The properties to return (defaults to all properties). The properties are the columns/headers of the table or series being requested. Use "*" to return everything.
 #     required: false
+#   - name: mindate
+#     type: date
+#     description: The minimum date for the time series to return
+#     required: false
+#   - name: maxdate
+#     type: date
+#     description: The maximum date for the time series to return
+#     required: false
 # examples:
-#   - '"HKEX/83079"'
-#   - '"HKEX/83079", "*"'
-#   - '"HKEX/83079", "date, nominal price, high, low"'
+#   - '"NASDAQOMX/XNDXT25"'
+#   - '"NASDAQOMX/XNDXT25", "*"'
+#   - '"NASDAQOMX/XNDXT25", "trade date, low, high"'
+#   - '"NASDAQOMX/XNDXT25", "*", "2019-09-01", "2019-09-30"'
+#   - '"NASDAQOMX/XNDXT25", "trade date, low, high", "2019-09-01", "2019-09-30"'
 # notes: |
 # ---
 
@@ -51,6 +61,9 @@ def flexio_handler(flex):
     params = OrderedDict()
     params['name'] = {'required': True, 'type': 'string', 'coerce': str}
     params['properties'] = {'required': False, 'validator': validator_list, 'coerce': to_list, 'default': '*'}
+    params['mindate']  = {'required': False, 'type': 'date', 'default': '1900-01-01', 'coerce': to_date}
+    params['maxdate']  = {'required': False, 'type': 'date', 'default': '2099-12-31', 'coerce': to_date}
+
     input = dict(zip(params.keys(), input))
 
     # validate the mapped input against the validator
@@ -64,7 +77,7 @@ def flexio_handler(flex):
 
         # make the request
         # see here for more info: https://docs.quandl.com/
-        url_query_params = {"api_key": auth_token}
+        url_query_params = {"api_key": auth_token, "start_date": input['mindate'], "end_date": input['maxdate']}
         url_query_str = urllib.parse.urlencode(url_query_params)
 
         url = 'https://www.quandl.com/api/v3/datasets/' + input['name'] + '?' + url_query_str
@@ -127,4 +140,13 @@ def to_list(value):
     if isinstance(value, list):
         return list(itertools.chain.from_iterable(value))
     return None
+
+def to_date(value):
+    # if we have a number, treat it as numeric date value from
+    # a spreadsheet (days since 1900; e.g. 1 is 1900-01-01)
+    if isinstance(value, (int, float)):
+        return datetime(1900,1,1) + timedelta(days=(value-1))
+    if isinstance(value, str):
+        return datetime.strptime(value, '%Y-%m-%d')
+    return value
 
