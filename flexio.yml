@@ -4,6 +4,7 @@ image:
   src: https://logo.clearbit.com/quandl.com
   alt: Quandl logo
 functions:
+  - path: quandl-list.py
 prompts:
   - element: form
     name: form_api_key
