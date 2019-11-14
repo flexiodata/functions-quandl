@@ -1,7 +1,7 @@
 # ---
-# name: quandl-list
+# name: quandl-series
 # deployed: true
-# title: Quandl List Table
+# title: Quandl Series
 # description: Returns the contents of a table on Quandl
 # params:
 #   - name: name
