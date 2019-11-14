@@ -1,0 +1,24 @@
+title: Quandl Integration
+description: Functions for accessing Quandl
+image:
+  src: https://logo.clearbit.com/quandl.com
+  alt: Quandl logo
+functions:
+prompts:
+  - element: form
+    name: form_api_key
+    title: Quandl API key
+    description: |
+      Use your Quandl API key to access the data on Quandl.
+    class: el-form--cozy el-form__label-tiny
+    rules:
+      quandl_api_key:
+        - required: true
+          message: Please enter a valid API key to continue.
+    form_items:
+      - element: input
+        type: text
+        name: quandl_api_key
+        label: API key
+        placeholder: API key
+        value: ''
