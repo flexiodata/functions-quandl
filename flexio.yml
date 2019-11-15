@@ -5,6 +5,7 @@ image:
   alt: Quandl logo
 functions:
   - path: quandl-series.py
+  - path: quandl-table.py
 prompts:
   - element: form
     name: form_api_key
