@@ -2,15 +2,15 @@
 # name: quandl-series
 # deployed: true
 # title: Quandl Series
-# description: Returns the contents of a table on Quandl
+# description: Returns the contents of a time series on Quandl
 # params:
 #   - name: name
 #     type: string
-#     description: The name of the table to return
+#     description: The name of the time series to return
 #     required: true
 #   - name: properties
 #     type: array
-#     description: The properties to return (defaults to all properties). The properties are the columns/headers of the table or series being requested. Use "*" to return everything.
+#     description: The properties to return (defaults to all properties). The properties are the columns/headers of the time series being requested. Use "*" to return everything.
 #     required: false
 #   - name: mindate
 #     type: date
