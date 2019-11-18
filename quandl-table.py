@@ -49,6 +49,7 @@ def flexio_handler(flex):
     params = OrderedDict()
     params['name'] = {'required': True, 'type': 'string', 'coerce': str}
     params['properties'] = {'required': False, 'validator': validator_list, 'coerce': to_list, 'default': '*'}
+    params['filter'] = {'required': True, 'type': 'string', 'coerce': str}
 
     input = dict(zip(params.keys(), input))
 
@@ -61,9 +62,25 @@ def flexio_handler(flex):
 
     try:
 
-        # make the request
+        # get any optional filter
+        filter = input['filter']
+        filter = urllib.parse.parse_qs(filter)
+        if len(filter) == 0:
+            filter = None
+
+        # build up the query string and make the request
         # see here for more info: https://docs.quandl.com/
-        url_query_params = {"api_key": auth_token}
+        url_query_params = {}
+
+        # note: in quandl api, filters are tables are specified as url query params;
+        # multiple values per key are specified as delimited list; e.g. ticker=AAPL,GOOG
+        # following logic converts multiple items with the same key to a delimited list
+        # as well as passes through multiple value per a single key:
+        # * ticker=AAPL&ticker=GOOG => ticker=AAPL,GOOG
+        # * ticker=AAPL,GOOG => ticker=AAPL,GOOG
+        for filter_key, filter_list in filter.items():
+            url_query_params[filter_key] = ",".join(filter_list)
+        url_query_params['api_key'] = auth_token
         url_query_str = urllib.parse.urlencode(url_query_params)
 
         url = 'https://www.quandl.com/api/v3/datatables/' + input['name'] + '?' + url_query_str
@@ -72,9 +89,6 @@ def flexio_handler(flex):
         }
         response = requests.get(url, headers=headers)
         content = response.json()
-
-        #flex.output.write(content)
-        #return
 
         # get the columns and rows; clean up columns by converting them to
         # lowercase and removing leading/trailing spaces
