@@ -10,19 +10,11 @@
 #     required: true
 #   - name: properties
 #     type: array
-#     description: >
-#         The properties to return (defaults to all properties). The properties
-#         are the columns/headers of the table being requested. Use "*" to return everything.
-#
+#     description: The properties to return (defaults to all properties). The properties are the columns/headers of the table being requested. Use "*" to return everything.
 #     required: false
 #   - name: filter
 #     type: string
-#     description: >
-#         Filter to apply with key/values specified as a URL query string. The keys allowed
-#         are table-dependent; see the Quandl documentation for each table to find out the filter
-#         parameters that are allowed. If a filter isn't specified, all the results up to the
-#         maximum result limit will be returned.
-#
+#     description: Filter to apply with key/values specified as a URL query string. The keys allowed are table-dependent; see the Quandl documentation for each table to find out the filter parameters that are allowed. If a filter isn't specified, all the results up to the maximum result limit will be returned.
 #     required: false
 # examples:
 #   - '"SHARADAR/SF3"'
