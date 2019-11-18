@@ -13,7 +13,10 @@
 #     description: The properties to return (defaults to all properties). The properties are the columns/headers of the table being requested. Use "*" to return everything.
 #     required: false
 # examples:
-#   - '"FXCM/D1"'
+#   - '"SHARADAR/SF3"',
+#   - '"SHARADAR/SF3", "*", "ticker=AAPL'
+#   - '"SHARADAR/SF3", "*", "investorname=VANGUARD GROUP INC'
+#   - '"SHARADAR/SF3", "*", "ticker=AAPL,MSFT&investorname=VANGUARD GROUP INC'
 # notes: |
 # ---
 
