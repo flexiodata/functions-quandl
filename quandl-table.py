@@ -67,18 +67,17 @@ def flexio_handler(flex):
     result = []
     cursor_id = False
     page_idx = 0
-    max_pages = 1
+    max_pages = 10
 
     while True:
-        page_result = getTablePage(auth_token, table_name, table_properties, table_filter, cursor_id)
-        cursor_id = page_result['cursor']
 
+        page_result = getTablePage(auth_token, table_name, table_properties, table_filter, cursor_id)
         if len(page_result['data']) > 0:
             result.append(page_result['data'])
 
+        cursor_id = page_result['cursor']
         if cursor_id is None or page_idx >= max_pages:
             break
-
         page_idx = page_idx + 1
 
     result = json.dumps(result, default=to_string)
@@ -88,12 +87,29 @@ def flexio_handler(flex):
 def getTablePage(auth_token, table_name, table_properties, table_filter, cursor_id):
 
     try:
+        # get any optional filter
+        filter = urllib.parse.parse_qs(table_filter)
+        if filter is None:
+            filter = {}
+
+        # build up the query string and make the request
+        # see here for more info: https://docs.quandl.com/
+        url_query_params = {}
+
+        # note: in quandl api, filters are tables are specified as url query params;
+        # multiple values per key are specified as delimited list; e.g. ticker=AAPL,GOOG
+        # following logic converts multiple items with the same key to a delimited list
+        # as well as passes through multiple value per a single key:
+        # * ticker=AAPL&ticker=GOOG => ticker=AAPL,GOOG
+        # * ticker=AAPL,GOOG => ticker=AAPL,GOOG
+        for filter_key, filter_list in filter.items():
+            url_query_params[filter_key] = ",".join(filter_list)
+        url_query_params['api_key'] = auth_token
+        url_query_params['qopts.per_page'] = 10000
+        url_query_str = urllib.parse.urlencode(url_query_params)
 
         # make the request
         # see here for more info: https://docs.quandl.com/
-        url_query_params = {"api_key": auth_token, "qopts.per_page": 10000}
-        url_query_str = urllib.parse.urlencode(url_query_params)
-
         url = 'https://www.quandl.com/api/v3/datatables/' + table_name + '?' + url_query_str
         headers = {
             'Accept': 'application/json'
@@ -133,8 +149,6 @@ def getTablePage(auth_token, table_name, table_properties, table_filter, cursor_
         # append the rows
         for r in rows:
             item = dict(zip(properties, r)) # create a key/value for each column/row so we can return appropriate columns
-            if filter is not None and matchesFilter(item, filter) is False:
-                continue
             item_filtered = [item.get(p) or '' for p in properties]
             data.append(item_filtered)
 
@@ -142,16 +156,6 @@ def getTablePage(auth_token, table_name, table_properties, table_filter, cursor_
 
     except:
         raise RuntimeError
-
-def matchesFilter(item, filter):
-    for filter_key, filter_values in filter.items():
-        item_value = item.get(filter_key)
-        if item_value is None:
-            return False
-        item_value = str(item_value)
-        if item_value not in filter_values:
-            return False
-    return True
 
 def validator_list(field, value, error):
     if isinstance(value, str):
