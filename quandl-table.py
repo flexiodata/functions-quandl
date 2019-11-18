@@ -23,10 +23,10 @@
 #         maximum result limit will be returned.
 #     required: false
 # examples:
-#   - '"SHARADAR/SF3"',
-#   - '"SHARADAR/SF3", "*", "ticker=AAPL'
-#   - '"SHARADAR/SF3", "*", "investorname=VANGUARD GROUP INC'
-#   - '"SHARADAR/SF3", "*", "ticker=AAPL,MSFT&investorname=VANGUARD GROUP INC'
+#   - '"SHARADAR/SF3"'
+#   - '"SHARADAR/SF3", "*", "ticker=AAPL"'
+#   - '"SHARADAR/SF3", "*", "investorname=VANGUARD GROUP INC"'
+#   - '"SHARADAR/SF3", "*", "ticker=AAPL,MSFT&investorname=VANGUARD GROUP INC"'
 # notes: |
 #   Results are limited to 100k rows.
 # ---
