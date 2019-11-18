@@ -49,7 +49,7 @@ def flexio_handler(flex):
     params = OrderedDict()
     params['name'] = {'required': True, 'type': 'string', 'coerce': str}
     params['properties'] = {'required': False, 'validator': validator_list, 'coerce': to_list, 'default': '*'}
-    params['filter'] = {'required': True, 'type': 'string', 'coerce': str}
+    params['filter'] = {'required': False, 'type': 'string', 'coerce': str, 'default': ''}
 
     input = dict(zip(params.keys(), input))
 
@@ -60,35 +60,49 @@ def flexio_handler(flex):
     if input is None:
         raise ValueError
 
+    table_name = input['name']
+    table_properties = input['properties']
+    table_filter = input['filter']
+
+    result = []
+    cursor_id = False
+    page_idx = 0
+    max_pages = 1
+
+    while True:
+        page_result = getTablePage(auth_token, table_name, table_properties, table_filter, cursor_id)
+        cursor_id = page_result['cursor']
+
+        if len(page_result['data']) > 0:
+            result.append(page_result['data'])
+
+        if cursor_id is None or page_idx >= max_pages:
+            break
+
+        page_idx = page_idx + 1
+
+    result = json.dumps(result, default=to_string)
+    flex.output.content_type = "application/json"
+    flex.output.write(result)
+
+def getTablePage(auth_token, table_name, table_properties, table_filter, cursor_id):
+
     try:
 
-        # get any optional filter
-        filter = input['filter']
-        filter = urllib.parse.parse_qs(filter)
-        if len(filter) == 0:
-            filter = None
-
-        # build up the query string and make the request
+        # make the request
         # see here for more info: https://docs.quandl.com/
-        url_query_params = {}
-
-        # note: in quandl api, filters are tables are specified as url query params;
-        # multiple values per key are specified as delimited list; e.g. ticker=AAPL,GOOG
-        # following logic converts multiple items with the same key to a delimited list
-        # as well as passes through multiple value per a single key:
-        # * ticker=AAPL&ticker=GOOG => ticker=AAPL,GOOG
-        # * ticker=AAPL,GOOG => ticker=AAPL,GOOG
-        for filter_key, filter_list in filter.items():
-            url_query_params[filter_key] = ",".join(filter_list)
-        url_query_params['api_key'] = auth_token
+        url_query_params = {"api_key": auth_token, "qopts.per_page": 10000}
         url_query_str = urllib.parse.urlencode(url_query_params)
 
-        url = 'https://www.quandl.com/api/v3/datatables/' + input['name'] + '?' + url_query_str
+        url = 'https://www.quandl.com/api/v3/datatables/' + table_name + '?' + url_query_str
         headers = {
             'Accept': 'application/json'
         }
         response = requests.get(url, headers=headers)
         content = response.json()
+
+        # get the cursor
+        next_cursor_id = content.get('meta',{}).get('next_cursor_id')
 
         # get the columns and rows; clean up columns by converting them to
         # lowercase and removing leading/trailing spaces
@@ -98,25 +112,46 @@ def flexio_handler(flex):
 
         # get the properties (columns) to return based on the input;
         # if we have a wildcard, get all the properties
-        properties = [p.lower().strip() for p in input['properties']]
+        properties = [p.lower().strip() for p in table_properties]
         if len(properties) == 1 and properties[0] == '*':
             properties = columns
 
-        # build up the result
-        result = []
+        # get any optional filter
+        filter = table_filter
+        filter = urllib.parse.parse_qs(filter)
+        if len(filter) == 0:
+            filter = None
 
-        result.append(properties)
+        # build up the result
+        data = []
+
+        # if the input cursor_id is False, we're on the first row, so include the columns
+        # on subsequent requests, the cursor_id will be either a string or None
+        if cursor_id is False:
+            data.append(properties)
+
+        # append the rows
         for r in rows:
             item = dict(zip(properties, r)) # create a key/value for each column/row so we can return appropriate columns
+            if filter is not None and matchesFilter(item, filter) is False:
+                continue
             item_filtered = [item.get(p) or '' for p in properties]
-            result.append(item_filtered)
+            data.append(item_filtered)
 
-        result = json.dumps(result, default=to_string)
-        flex.output.content_type = "application/json"
-        flex.output.write(result)
+        return {"data": data, "cursor": next_cursor_id}
 
     except:
         raise RuntimeError
+
+def matchesFilter(item, filter):
+    for filter_key, filter_values in filter.items():
+        item_value = item.get(filter_key)
+        if item_value is None:
+            return False
+        item_value = str(item_value)
+        if item_value not in filter_values:
+            return False
+    return True
 
 def validator_list(field, value, error):
     if isinstance(value, str):
