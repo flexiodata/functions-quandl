@@ -81,7 +81,7 @@ def flexio_handler(flex):
 
         page_result = getTablePage(auth_token, table_name, table_properties, table_filter, cursor_id)
         if len(page_result['data']) > 0:
-            result.append(page_result['data'])
+            result += page_result['data']
 
         cursor_id = page_result['cursor']
         if cursor_id is None or page_idx >= max_pages:
