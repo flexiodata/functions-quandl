@@ -104,7 +104,7 @@ def flexio_handler(flex):
 
         result.append(properties)
         for r in rows:
-            item = dict(zip(properties, r)) # create a key/value for each column/row so we can return appropriate columns
+            item = dict(zip(columns, r)) # create a key/value for each column/row so we can return appropriate columns
             item_filtered = [item.get(p) or '' for p in properties]
             result.append(item_filtered)
 
