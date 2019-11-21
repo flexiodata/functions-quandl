@@ -1,4 +1,4 @@
-# Quandl Google Sheets and Excel Spreadsheet Add on
+# Quandl Google Sheets & Excel Spreadsheet Add on
 
 Quandl is a premier source for open, commercial, and alternative data, with a particular focus on investment professionals. This Quandl spreadsheet integration for Google Sheets and Microsoft Excel enables you to import table and time-series datasets from Quandl. This add-on will enable you to integrate on-demand, refreshable stock market and portfolio data without leaving your spreadsheet.
 
