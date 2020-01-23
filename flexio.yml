@@ -1,7 +1,7 @@
 title: Quandl Integration
 description: Functions for accessing Quandl
 image:
-  src: https://logo.clearbit.com/quandl.com
+  src: https://static.flex.io/assets/logos2/quandl.png
   alt: Quandl logo
 functions:
   - path: quandl-series.py
