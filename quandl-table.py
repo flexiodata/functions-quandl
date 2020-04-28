@@ -26,8 +26,10 @@
 # ---
 
 import json
-import requests
 import urllib
+import requests
+from requests.adapters import HTTPAdapter
+from requests.packages.urllib3.util.retry import Retry
 import itertools
 from datetime import *
 from decimal import *
@@ -37,12 +39,13 @@ from collections import OrderedDict
 # main function entry point
 def flexio_handler(flex):
 
+    # configuration
+    max_rows_to_return = 1 # maximum rows to return
+
     # get the api key from the variable input
     auth_token = dict(flex.vars).get('quandl_api_key')
     if auth_token is None:
-       flex.output.content_type = "application/json"
-       flex.output.write([[""]])
-       return
+        raise ValueError
 
     # get the input
     input = flex.input.read()
@@ -58,7 +61,6 @@ def flexio_handler(flex):
     params['name'] = {'required': True, 'type': 'string', 'coerce': str}
     params['properties'] = {'required': False, 'validator': validator_list, 'coerce': to_list, 'default': '*'}
     params['filter'] = {'required': False, 'type': 'string', 'coerce': str, 'default': ''}
-
     input = dict(zip(params.keys(), input))
 
     # validate the mapped input against the validator
@@ -68,65 +70,78 @@ def flexio_handler(flex):
     if input is None:
         raise ValueError
 
-    table_name = input['name']
-    table_properties = input['properties']
-    table_filter = input['filter']
+    name = input['name']
+    filter = input['filter']
+    properties = [p.lower().strip() for p in input['properties']]
 
+    # get the result
     result = []
-    cursor_id = False
-    page_idx = 0
-    max_pages = 10
 
-    while True:
+    current_row = 0
+    for r in getRows(auth_token, name, filter):
 
-        page_result = getTablePage(auth_token, table_name, table_properties, table_filter, cursor_id)
-        if len(page_result['data']) > 0:
-            result += page_result['data']
-
-        cursor_id = page_result['cursor']
-        if cursor_id is None or page_idx >= max_pages:
+        if current_row >= max_rows_to_return:
             break
-        page_idx = page_idx + 1
+
+        # get the row
+        columns, row = r['columns'], r['row']
+        if len(properties) == 1 and properties[0] == '*':
+            properties = columns
+
+        # if we're on the first row, append the columns
+        if current_row == 0:
+            result.append(properties)
+
+        # if we don't have any row data, we're done
+        if row is None:
+            break
+
+        item = dict(zip(columns, row)) # create a key/value for each column/row so we can return appropriate columns
+        item_selected = [item.get(p) or '' for p in properties]
+        result.append(item_selected)
+        current_row = current_row + 1
 
     result = json.dumps(result, default=to_string)
     flex.output.content_type = "application/json"
     flex.output.write(result)
 
-def getTablePage(auth_token, table_name, table_properties, table_filter, cursor_id):
+def getRows(auth_token, table_name, table_filter):
 
-    try:
-        # get any optional filter
-        filter = urllib.parse.parse_qs(table_filter)
-        if filter is None:
-            filter = {}
+    # see here for more info: https://docs.quandl.com/
 
-        # build up the query string and make the request
-        # see here for more info: https://docs.quandl.com/
-        url_query_params = {}
+    # configure the basic query paraemters
+    url_query_params = {}
+    url_query_params['api_key'] = auth_token
+    url_query_params['qopts.per_page'] = 5000
 
-        # note: in quandl api, filters are tables are specified as url query params;
-        # multiple values per key are specified as delimited list; e.g. ticker=AAPL,GOOG
-        # following logic converts multiple items with the same key to a delimited list
-        # as well as passes through multiple value per a single key:
-        # * ticker=AAPL&ticker=GOOG => ticker=AAPL,GOOG
-        # * ticker=AAPL,GOOG => ticker=AAPL,GOOG
-        for filter_key, filter_list in filter.items():
-            url_query_params[filter_key] = ",".join(filter_list)
-        url_query_params['api_key'] = auth_token
-        url_query_params['qopts.per_page'] = 10000
-        url_query_str = urllib.parse.urlencode(url_query_params)
+    # note: in quandl api, filters are tables are specified as url query params;
+    # multiple values per key are specified as delimited list; e.g. ticker=AAPL,GOOG
+    # following logic converts multiple items with the same key to a delimited list
+    # as well as passes through multiple value per a single key:
+    # * ticker=AAPL&ticker=GOOG => ticker=AAPL,GOOG
+    # * ticker=AAPL,GOOG => ticker=AAPL,GOOG
+    filter = urllib.parse.parse_qs(table_filter)
+    if filter is None:
+        filter = {}
+    for filter_key, filter_list in filter.items():
+        url_query_params[filter_key] = ",".join(filter_list)
+
+    cursor_id = None
+    while True:
+
+        # if we have a cursor, add it to get the next page
+        if cursor_id is not None:
+            url_query_params['qopts.cursor_id'] = cursor_id
 
         # make the request
-        # see here for more info: https://docs.quandl.com/
+        url_query_str = urllib.parse.urlencode(url_query_params)
         url = 'https://www.quandl.com/api/v3/datatables/' + table_name + '?' + url_query_str
         headers = {
             'Accept': 'application/json'
         }
-        response = requests.get(url, headers=headers)
+        response = requests_retry_session().get(url, headers=headers)
+        response.raise_for_status()
         content = response.json()
-
-        # get the cursor
-        next_cursor_id = content.get('meta',{}).get('next_cursor_id')
 
         # get the columns and rows; clean up columns by converting them to
         # lowercase and removing leading/trailing spaces
@@ -134,36 +149,34 @@ def getTablePage(auth_token, table_name, table_properties, table_filter, cursor_
         columns = content.get('datatable',{}).get('columns',[])
         columns = [c.get('name','').lower().strip() for c in columns]
 
-        # get the properties (columns) to return based on the input;
-        # if we have a wildcard, get all the properties
-        properties = [p.lower().strip() for p in table_properties]
-        if len(properties) == 1 and properties[0] == '*':
-            properties = columns
-
-        # get any optional filter
-        filter = table_filter
-        filter = urllib.parse.parse_qs(filter)
-        if len(filter) == 0:
-            filter = None
-
-        # build up the result
-        data = []
-
-        # if the input cursor_id is False, we're on the first row, so include the columns
-        # on subsequent requests, the cursor_id will be either a string or None
-        if cursor_id is False:
-            data.append(properties)
-
-        # append the rows
+        if len(rows) == 0:
+            return {'columns': columns, 'row': None, }
         for r in rows:
-            item = dict(zip(columns, r)) # create a key/value for each column/row so we can return appropriate columns
-            item_filtered = [item.get(p) or '' for p in properties]
-            data.append(item_filtered)
+            yield {'columns': columns, 'row': r}
 
-        return {"data": data, "cursor": next_cursor_id}
+        # get the cursor; if the cursor is None, there's no more items
+        cursor_id = content.get('meta',{}).get('next_cursor_id')
+        if cursor_id is None:
+                return
 
-    except:
-        raise RuntimeError
+def requests_retry_session(
+    retries=3,
+    backoff_factor=0.3,
+    status_forcelist=(500, 502, 504),
+    session=None,
+):
+    session = session or requests.Session()
+    retry = Retry(
+        total=retries,
+        read=retries,
+        connect=retries,
+        backoff_factor=backoff_factor,
+        status_forcelist=status_forcelist,
+    )
+    adapter = HTTPAdapter(max_retries=retry)
+    session.mount('http://', adapter)
+    session.mount('https://', adapter)
+    return session
 
 def validator_list(field, value, error):
     if isinstance(value, str):
