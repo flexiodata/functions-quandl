@@ -15,15 +15,15 @@ templates:
     description: 'Quickly find and import tables from Quandl in your spreadsheet'
     gsheets_spreadsheet_id: ''
     excel_spreadsheet_path: ''
-    in_production: false
-    in_staging: false
-  - name: lookup-time-series 
+    is_public: false
+    is_private: false
+  - name: lookup-time-series
     title: 'Import time-series data sets'
     description: 'Quickly find and import time-series data sets from Quandl in your spreadsheet'
     gsheets_spreadsheet_id: ''
     excel_spreadsheet_path: ''
-    in_production: false
-    in_staging: false
+    is_public: false
+    is_private: false
 
 prompts:
   - element: form
