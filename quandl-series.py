@@ -73,47 +73,43 @@ def flexio_handler(flex):
     if input is None:
         raise ValueError
 
-    try:
+    # make the request
+    # see here for more info: https://docs.quandl.com/
+    url_query_params = {"api_key": auth_token, "start_date": input['mindate'], "end_date": input['maxdate']}
+    url_query_str = urllib.parse.urlencode(url_query_params)
 
-        # make the request
-        # see here for more info: https://docs.quandl.com/
-        url_query_params = {"api_key": auth_token, "start_date": input['mindate'], "end_date": input['maxdate']}
-        url_query_str = urllib.parse.urlencode(url_query_params)
+    url = 'https://www.quandl.com/api/v3/datasets/' + input['name'] + '?' + url_query_str
+    headers = {
+        'Accept': 'application/json'
+    }
+    response = requests_retry_session().get(url, headers=headers)
+    response.raise_for_status()
+    content = response.json()
 
-        url = 'https://www.quandl.com/api/v3/datasets/' + input['name'] + '?' + url_query_str
-        headers = {
-            'Accept': 'application/json'
-        }
-        response = requests_retry_session().get(url, headers=headers)
-        content = response.json()
+    # get the columns and rows; clean up columns by converting them to
+    # lowercase and removing leading/trailing spaces
+    rows = content.get('dataset',{}).get('data',[])
+    columns = content.get('dataset',{}).get('column_names',[])
+    columns = [c.lower().strip() for c in columns]
 
-        # get the columns and rows; clean up columns by converting them to
-        # lowercase and removing leading/trailing spaces
-        rows = content.get('dataset',{}).get('data',[])
-        columns = content.get('dataset',{}).get('column_names',[])
-        columns = [c.lower().strip() for c in columns]
+    # get the properties (columns) to return based on the input;
+    # if we have a wildcard, get all the properties
+    properties = [p.lower().strip() for p in input['properties']]
+    if len(properties) == 1 and properties[0] == '*':
+        properties = columns
 
-        # get the properties (columns) to return based on the input;
-        # if we have a wildcard, get all the properties
-        properties = [p.lower().strip() for p in input['properties']]
-        if len(properties) == 1 and properties[0] == '*':
-            properties = columns
+    # build up the result
+    result = []
 
-        # build up the result
-        result = []
+    result.append(properties)
+    for r in rows:
+        item = dict(zip(columns, r)) # create a key/value for each column/row so we can return appropriate columns
+        item_filtered = [item.get(p) or '' for p in properties]
+        result.append(item_filtered)
 
-        result.append(properties)
-        for r in rows:
-            item = dict(zip(columns, r)) # create a key/value for each column/row so we can return appropriate columns
-            item_filtered = [item.get(p) or '' for p in properties]
-            result.append(item_filtered)
-
-        result = json.dumps(result, default=to_string)
-        flex.output.content_type = "application/json"
-        flex.output.write(result)
-
-    except:
-        raise RuntimeError
+    result = json.dumps(result, default=to_string)
+    flex.output.content_type = "application/json"
+    flex.output.write(result)
 
 def requests_retry_session(
     retries=3,
