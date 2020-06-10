@@ -46,9 +46,7 @@ def flexio_handler(flex):
     # get the api key from the variable input
     auth_token = dict(flex.vars).get('quandl_api_key')
     if auth_token is None:
-       flex.output.content_type = "application/json"
-       flex.output.write([[""]])
-       return
+        raise ValueError
 
     # get the input
     input = flex.input.read()
